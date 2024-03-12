@@ -28,8 +28,12 @@ impl<T: Copy + Default> RingBuffer<T> {
         self.buffer[self.tail]
     }
 
-    pub fn get(&self, offset: usize) -> T {
-        self.buffer[(self.tail + offset) % self.capacity()]
+    pub fn get(&self, offset: i32) -> T {
+        if self.tail as i32 + offset < 0 {
+            return self.buffer[(self.capacity() as i32 + (self.tail as i32 + offset) % self.capacity() as i32) as usize];
+        } else {
+            return self.buffer[((self.tail as i32 + offset) % self.capacity() as i32) as usize]
+        }
     }
 
     // `push` and `pop` write/read and advance the indices.
@@ -48,16 +52,24 @@ impl<T: Copy + Default> RingBuffer<T> {
         self.tail
     }
 
-    pub fn set_read_index(&mut self, index: usize) {
-        self.tail = index % self.capacity()
+    pub fn set_read_index(&mut self, index: i32) {
+        if index < 0 {
+            self.tail = (self.capacity() as i32 + index % self.capacity() as i32) as usize;
+        } else {
+            self.tail = (index % self.capacity() as i32) as usize;
+        }
     }
 
     pub fn get_write_index(&self) -> usize {
         self.head
     }
 
-    pub fn set_write_index(&mut self, index: usize) {
-        self.head = index % self.capacity()
+    pub fn set_write_index(&mut self, index: i32) {
+        if index < 0 {
+            self.head = (self.capacity() as i32 + index % self.capacity() as i32) as usize;
+        } else {
+            self.head = (index % self.capacity() as i32) as usize;
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -79,13 +91,29 @@ impl RingBuffer<f32> {
     // Return the value at at an offset from the current read index.
     // To handle fractional offsets, linearly interpolate between adjacent values. 
     pub fn get_frac(&self, offset: f32) -> f32 {
-        todo!("implement")
+        let truncated = offset as i32;
+        let decimal = offset - (truncated as f32);
+        let first_val = self.get(truncated);
+        let second_val = self.get(truncated + 1);
+        return first_val * (1.0 - decimal) + second_val * (decimal);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_get_frac() {
+        let capacity = 4;
+        let delay = 5;
+        let mut ring_buffer: RingBuffer<f32> = RingBuffer::new(capacity);
+        ring_buffer.push(5.0);
+        ring_buffer.push(10.0);
+        ring_buffer.set_read_index(0);
+        let result = ring_buffer.get_frac(0.25);
+        assert!(f32::abs(result - 6.25) <= 0.0001);
+    }
 
     #[test]
     fn test_wrapping() {
@@ -157,14 +185,14 @@ mod tests {
         assert_eq!(ring_buffer.get_read_index(), 0);
         assert_eq!(ring_buffer.get_write_index(), 0);
         for i in 0..ring_buffer.capacity() {
-            assert_eq!(ring_buffer.get(i), 0.0);
+            assert_eq!(ring_buffer.get(i as i32), 0.0);
         }
 
         // Fill ring buffer, mess with indices.
         let fill = 123.456;
         for i in 0..ring_buffer.capacity() {
             ring_buffer.push(fill);
-            assert_eq!(ring_buffer.get(i), fill);
+            assert_eq!(ring_buffer.get(i as i32), fill);
         }
 
         ring_buffer.set_write_index(17);
@@ -175,7 +203,7 @@ mod tests {
         assert_eq!(ring_buffer.get_read_index(), 0);
         assert_eq!(ring_buffer.get_write_index(), 0);
         for i in 0..ring_buffer.capacity() {
-            assert_eq!(ring_buffer.get(i), 0.0);
+            assert_eq!(ring_buffer.get(i as i32), 0.0);
         }
     }
 
@@ -184,14 +212,14 @@ mod tests {
         let capacity = 5;
         let mut ring_buffer = RingBuffer::<f32>::new(capacity);
 
-        ring_buffer.set_write_index(capacity);
+        ring_buffer.set_write_index(capacity as i32);
         assert_eq!(ring_buffer.get_write_index(), 0);
-        ring_buffer.set_write_index(capacity * 2 + 3);
+        ring_buffer.set_write_index(capacity as i32 * 2 + 3);
         assert_eq!(ring_buffer.get_write_index(), 3);
 
-        ring_buffer.set_read_index(capacity);
+        ring_buffer.set_read_index(capacity as i32);
         assert_eq!(ring_buffer.get_read_index(), 0);
-        ring_buffer.set_read_index(capacity * 2 + 3);
+        ring_buffer.set_read_index(capacity as i32 * 2 + 3);
         assert_eq!(ring_buffer.get_read_index(), 3);
 
         // NOTE: Negative indices are also weird, but we can't even pass them due to type checking!
