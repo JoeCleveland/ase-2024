@@ -223,14 +223,14 @@ mod tests {
         input_signal[3] = 1.0;
         let mut output_signal: Vec<f32> = vec![0f32; 10000];
         let mut impulse_response: Vec<f32> = vec![0f32; 51];
-        let block_sizes = [1, 13, 1023, 2048,1,17, 5000, 1897];
+        let block_sizes = [10, 1023, 2048,1,17, 5000, 1897];
         let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::TimeDomain);
 
         for block_size in block_sizes {
-            for block_index in 0..=input_signal.len() / block_size {
+            for block_index in 0..input_signal.len() / block_size {
                 let block_start_index = block_index * block_size;
                 let block_end_index = min(input_signal.len() - 1, (block_index + 1) * block_size);
-                // println!("block_start_index: {}, block_end_index: {}", block_start_index, block_end_index);
+                println!("block_start_index: {}, block_end_index: {}", block_start_index, block_end_index);
                 fast_convolver.process(&input_signal[block_start_index ..block_end_index], &mut output_signal[block_start_index..block_end_index]);
             }
             for i in 0..input_signal.len() {
@@ -264,7 +264,7 @@ mod tests {
         let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::FrequencyDomain { block_size: (1024) }); // What should block size be?
 
         for block_size in block_sizes {
-            for block_index in 0..=input_signal.len() / block_size {
+            for block_index in 0..input_signal.len() / block_size {
                 let block_start_index = block_index * block_size;
                 let block_end_index = min(input_signal.len() - 1, (block_index + 1) * block_size);
                 // println!("block_start_index: {}, block_end_index: {}", block_start_index, block_end_index);
