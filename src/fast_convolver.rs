@@ -223,7 +223,7 @@ mod tests {
         input_signal[3] = 1.0;
         let mut output_signal: Vec<f32> = vec![0f32; 10000];
         let mut impulse_response: Vec<f32> = vec![0f32; 51];
-        let block_sizes = [10, 1023, 2048,1,17, 5000, 1897];
+        let block_sizes = [1, 13, 1023, 2048,1,17, 5000, 1897];
         let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::TimeDomain);
 
         for block_size in block_sizes {
