@@ -45,8 +45,8 @@ fn build_filter_bank(impulse_response: Vec<f32>, block_size: usize) -> Vec<Vec<C
 
 impl FastConvolver {
     pub fn new(impulse_response: &[f32], mode: ConvolutionMode) -> Self {
-        let mut block_size = 0;
-        let mut n_filters = 0;
+        let mut block_size = 1;
+        let mut n_filters = 1;
 
         let vec_impulse: Vec<f32> = match mode {
             ConvolutionMode::FrequencyDomain { block_size: b_s } => {
@@ -78,20 +78,27 @@ impl FastConvolver {
     }
 
     fn process_linear(&mut self, input: &[f32], output: &mut [f32]) {
-        let iL = self.impulse_response.len();
-        let pbL = self.previous_block.len();
-        for i in 0..input.len() - iL {
+        let iL: i32 = self.impulse_response.len() as i32;
+        let pbL: i32 = self.previous_block.len() as i32;
+        for i in 0..input.len() as i32 {
             let mut accum = 0.0;
-            for j in 0..self.impulse_response.len() {
+            for j in 0..self.impulse_response.len() as i32 {
                 if i + j < iL - 1 {
-                    accum += self.impulse_response[j] * self.previous_block[pbL - (iL - 2) + i + j];
+                    accum += self.impulse_response[j as usize] * self.previous_block[(i + j + 1) as usize];
                 } else {
-                    accum += self.impulse_response[j] * input[i + j - iL + 1];
+                    accum += self.impulse_response[j as usize] * input[(i + j - iL + 1) as usize];
                 }
             }
-            output[i] = accum;
+            output[i as usize] = accum;
         }
-        self.previous_block = output.to_vec();
+        //Shift previous block back by input size
+        //Then put input at the end
+        for i in 0..pbL - input.len() as i32 {
+            self.previous_block[i as usize] = self.previous_block[(i + input.len() as i32) as usize]
+        }
+        for i in 0..input.len() as i32 {
+            self.previous_block[(pbL - input.len() as i32 + i) as usize] = input[i as usize];
+        }
     }
 
     fn process_freq_domain(&mut self, input: &[f32], output: &mut [f32]) {
@@ -150,18 +157,13 @@ impl FastConvolver {
     }
 
     pub fn flush(&mut self, output: &mut [f32]) {
-        let iL = self.impulse_response.len();
-        for i in 0..self.previous_block.len() - iL {
-            let mut accum = 0.0;
-            for j in 0..self.impulse_response.len() {
-                accum += self.previous_block[i + j] * self.impulse_response[j];
-            }
-            output[i] = accum;
-        }
+        //Run linear process on an input of zeros 
+        let input = vec![0.0; self.previous_block.len()];
+        self.process_linear(&input, output);
     }
 
     pub fn get_flush_length(&mut self) -> usize {
-        return self.previous_block.len() - (self.impulse_response.len() - 1);
+        return self.previous_block.len();
     }
 
 }
