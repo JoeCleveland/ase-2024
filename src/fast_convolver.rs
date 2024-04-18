@@ -166,3 +166,111 @@ impl FastConvolver {
 
 }
 
+#[cfg(test)]
+mod tests {
+    use std::cmp::{max, min};
+
+    use super::*;
+    use rand::Rng;
+
+    /** 
+     * identity: generate a random IR of length 51 samples and an impulse as input signal at sample index 3; make the input signal 10 samples long. 
+     * Check the correct values of the 10 samples of the output signal.
+    * flush: use the same signals as in identity, but now get the full tail of the impulse response 
+    and check for correctness
+    * blocksize: for an input signal of length 10000 samples, implement a test similar to identity with a succession of 
+    different input/output block sizes (1, 13, 1023, 2048,1,17, 5000, 1897)
+     * **/
+     
+    #[test]
+    fn test_identity() {
+        let mut rng = rand::thread_rng();
+        let input_signal: Vec<f32> = vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let mut output_signal: Vec<f32> = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let mut impulse_response: Vec<f32> = vec![0f32; 51];
+        let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::TimeDomain);
+        for i in impulse_response.iter_mut() {
+            *i = rng.gen_range(-1.0..=1.0);
+        }
+        fast_convolver.process(&input_signal, &mut output_signal);
+        for i in 0..input_signal.len() {
+            assert_eq!(input_signal[i], output_signal[i]);
+        }
+    }
+
+    #[test]
+    // fn test_flush() {
+    //     let mut rng = rand::thread_rng();
+    //     let input_signal: Vec<f32> = vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    //     let mut output_signal: Vec<f32> = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    //     let mut impulse_response: Vec<f32> = vec![0f32; 51];
+    //     let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::TimeDomain);
+    //     for i in impulse_response.iter_mut() {
+    //         *i = rng.gen_range(-1.0..=1.0);
+    //     }
+    //     fast_convolver.process(&input_signal, &mut output_signal);
+    //     for i in 0..input_signal.len() {
+    //         assert_eq!(input_signal[i], output_signal[i]);
+    //     }
+    // }
+
+    #[test]
+    fn test_blocksize () {
+        let mut rng = rand::thread_rng();
+        let mut input_signal: Vec<f32> = vec![0f32; 10000];
+        input_signal[3] = 1.0;
+        let mut output_signal: Vec<f32> = vec![0f32; 10000];
+        let mut impulse_response: Vec<f32> = vec![0f32; 51];
+        let block_sizes = [1, 13, 1023, 2048,1,17, 5000, 1897];
+        let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::TimeDomain);
+
+        for block_size in block_sizes {
+            for block_index in 0..=input_signal.len() / block_size {
+                let block_start_index = block_index * block_size;
+                let block_end_index = min(input_signal.len() - 1, (block_index + 1) * block_size);
+                // println!("block_start_index: {}, block_end_index: {}", block_start_index, block_end_index);
+                fast_convolver.process(&input_signal[block_start_index ..block_end_index], &mut output_signal[block_start_index..block_end_index]);
+            }
+            for i in 0..input_signal.len() {
+                assert_eq!(input_signal[i], output_signal[i]);
+            }
+        }
+    }
+
+    fn test_identity_frequency_domain() {
+        let mut rng = rand::thread_rng();
+        let input_signal: Vec<f32> = vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let mut output_signal: Vec<f32> = vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let mut impulse_response: Vec<f32> = vec![0f32; 51];
+        let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::FrequencyDomain { block_size: (1024) }); // What should block size be?
+        for i in impulse_response.iter_mut() {
+            *i = rng.gen_range(-1.0..=1.0);
+        }
+        fast_convolver.process(&input_signal, &mut output_signal);
+        for i in 0..input_signal.len() {
+            assert_eq!(input_signal[i], output_signal[i]);
+        }
+    }
+
+    fn test_blocksize_frequency_domain() {
+        let mut rng = rand::thread_rng();
+        let mut input_signal: Vec<f32> = vec![0f32; 10000];
+        input_signal[3] = 1.0;
+        let mut output_signal: Vec<f32> = vec![0f32; 10000];
+        let mut impulse_response: Vec<f32> = vec![0f32; 51];
+        let block_sizes = [1, 13, 1023, 2048,1,17, 5000, 1897];
+        let mut fast_convolver = FastConvolver::new(&impulse_response, ConvolutionMode::FrequencyDomain { block_size: (1024) }); // What should block size be?
+
+        for block_size in block_sizes {
+            for block_index in 0..=input_signal.len() / block_size {
+                let block_start_index = block_index * block_size;
+                let block_end_index = min(input_signal.len() - 1, (block_index + 1) * block_size);
+                // println!("block_start_index: {}, block_end_index: {}", block_start_index, block_end_index);
+                fast_convolver.process(&input_signal[block_start_index ..block_end_index], &mut output_signal[block_start_index..block_end_index]);
+            }
+            for i in 0..input_signal.len() {
+                assert_eq!(input_signal[i], output_signal[i]);
+            }
+        }
+    }
+}
